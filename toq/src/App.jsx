@@ -13,6 +13,8 @@ const App = () => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [syllabus, setSyllabus] = useState({
+    courseName: '',
+    semester: '',
     ectsCredits: '',
     hours: '',
     lectures: '',
@@ -45,12 +47,12 @@ const App = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
-  
+
     setIsLoading(true);
     const userMessage = input;
     setMessages(prev => [...prev, { text: userMessage, isUser: true }]);
     setInput('');
-  
+
     try {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -60,10 +62,12 @@ const App = () => {
         },
         body: JSON.stringify({
           model: "gpt-4",
-          messages: [{ 
-            role: "user", 
-            content: `Génère un syllabus détaillé avec des valeurs pour chaque section :
+          messages: [{
+            role: "user",
+            content: `Génère un syllabus détaillé pour le cours "${userMessage}" avec des valeurs pour chaque section :
             
+            **Nom du Cours** : (ex: Introduction à la Programmation)
+            **Semestre** : (ex: S1 2024)
             **Crédits ECTS** : (ex: 5)
             **Nombre d'heures dispensées** : (ex: 40)
             **Cours Magistraux** : (ex: 20)
@@ -85,19 +89,24 @@ const App = () => {
           }],
           temperature: 0.7
         }),
-      });      
-  
+      });
+
+      console.log('API Key exists:', !!import.meta.env.VITE_REACT_APP_API_KEY);
+
       const data = await response.json();
+      console.log('Raw API Response:', data);
       if (!response.ok) throw new Error(data.error?.message || 'Erreur API');
-  
+
       const aiResponse = data.choices[0].message.content;
+      console.log('AI Response:', aiResponse);
       const newSyllabus = parseSyllabus(aiResponse);
+      console.log('Parsed Syllabus:', newSyllabus);
       setSyllabus(newSyllabus);
       setGenerated(true);
-  
+
       // Ajouter un message final de l'IA
       setMessages(prev => [
-        ...prev, 
+        ...prev,
         { text: "Voici le syllabus ! N'hésitez pas à me faire savoir si vous avez d'autres questions ou demandes.", isUser: false }
       ]);
     } catch (error) {
@@ -108,58 +117,47 @@ const App = () => {
       setIsLoading(false);
     }
   };
-  
+
   const parseSyllabus = (text) => {
-    const syllabus = {
-      ectsCredits: 'Non spécifié',
-      hours: 'Non spécifié',
-      lectures: 'Non spécifié',
-      tutorials: 'Non spécifié',
-      practicals: 'Non spécifié',
-      projects: 'Non spécifié',
-      mainTeacher: 'Non spécifié',
-      teachingTeam: 'Non spécifié',
-      teachingMethod: 'Non spécifié',
-      language: 'Non spécifié',
-      objectives: 'Non spécifié',
-      prerequisites: 'Non spécifié',
-      content: 'Non spécifié',
-      skills: 'Non spécifié',
-      evaluation: 'Non spécifié',
-      references: 'Non spécifié'
-    };
-  
+    console.log('Text to parse:', text);
+
     const patterns = {
-      ectsCredits: /Crédits ECTS\s*:\s*(.+)/i,
-      hours: /Nombre d'heures dispensées\s*:\s*(.+)/i,
-      lectures: /Cours Magistraux\s*:\s*(.+)/i,
-      tutorials: /Travaux Dirigés\s*:\s*(.+)/i,
-      practicals: /Travaux Pratiques\s*:\s*(.+)/i,
-      projects: /Projets\s*:\s*(.+)/i,
-      mainTeacher: /Enseignant référent\s*:\s*(.+)/i,
-      teachingTeam: /Equipe d'enseignants\s*:\s*(.+)/i,
-      teachingMethod: /Modalité pédagogique\s*:\s*(.+)/i,
-      language: /Langue\s*:\s*(.+)/i,
-      objectives: /Objectifs pédagogiques\s*:\s*([\s\S]+?)(?:\n[A-ZÀ-Ú]|$)/i,
-      prerequisites: /Pré requis\s*:\s*([\s\S]+?)(?:\n[A-ZÀ-Ú]|$)/i,
-      content: /Contenu\s*:\s*([\s\S]+?)(?:\n[A-ZÀ-Ú]|$)/i,
-      skills: /Compétences à acquérir\s*:\s*([\s\S]+?)(?:\n[A-ZÀ-Ú]|$)/i,
-      evaluation: /Modalités d'évaluation\s*:\s*([\s\S]+?)(?:\n[A-ZÀ-Ú]|$)/i,
-      references: /Références externes\s*:\s*([\s\S]+)/i
+      courseName: /\*\*Nom du Cours\*\* : ([^\n]+)/,
+      semester: /\*\*Semestre\*\* : ([^\n]+)/,
+      ectsCredits: /\*\*Crédits ECTS\*\* : ([^\n]+)/,
+      hours: /\*\*Nombre d'heures dispensées\*\* : ([^\n]+)/,
+      lectures: /\*\*Cours Magistraux\*\* : ([^\n]+)/,
+      tutorials: /\*\*Travaux Dirigés\*\* : ([^\n]+)/,
+      practicals: /\*\*Travaux Pratiques\*\* : ([^\n]+)/,
+      projects: /\*\*Projets\*\* : ([^\n]+)/,
+      mainTeacher: /\*\*Enseignant référent\*\* : ([^\n]+)/,
+      teachingTeam: /\*\*Equipe d'enseignants\*\* : ([^\n]+)/,
+      teachingMethod: /\*\*Modalité pédagogique\*\* : ([^\n]+)/,
+      language: /\*\*Langue\*\* : ([^\n]+)/,
+      objectives: /\*\*Objectifs pédagogiques\*\* : ([^]*?)(?=\*\*|$)/,
+      prerequisites: /\*\*Pré requis\*\* : ([^]*?)(?=\*\*|$)/,
+      content: /\*\*Contenu\*\* : ([^]*?)(?=\*\*|$)/,
+      skills: /\*\*Compétences à acquérir\*\* : ([^]*?)(?=\*\*|$)/,
+      evaluation: /\*\*Modalités d'évaluation\*\* : ([^]*?)(?=\*\*|$)/,
+      references: /\*\*Références externes\*\* : ([^]*?)(?=\*\*|$)/
     };
-  
-    for (const key in patterns) {
-      const match = text.match(patterns[key]);
-      if (match && match[1].trim()) {
-        syllabus[key] = match[1].trim();
-      }
+
+    const syllabus = {};
+
+    for (const [key, pattern] of Object.entries(patterns)) {
+      const match = text.match(pattern);
+      syllabus[key] = match ? match[1].trim() : 'Non spécifié';
+      console.log(`Parsing ${key}:`, syllabus[key]); // Pour déboguer
     }
-  
+
     return syllabus;
-  };  
+  }
 
   const handleSyllabusChange = (field, value) => {
-    setSyllabus(prev => ({ ...prev, [field]: value }));
+    setSyllabus(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   return (
@@ -167,36 +165,39 @@ const App = () => {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl flex overflow-hidden">
         {/* Chatbot Section */}
         <div className="w-full md:w-1/2 p-6 flex flex-col transition-all duration-500">
-  <h1 className="text-3xl font-bold text-gray-800 mb-4 text-center">Assistant IA</h1>
-  <div className="chatbot-container h-[65vh] overflow-y-auto pr-4 flex flex-col space-y-4">
-    {messages.map((message, index) => (
-      <ChatMessage key={index} message={message.text} isUser={message.isUser} />
-    ))}
-    <div ref={messagesEndRef} />
-  </div>
-  <form onSubmit={handleSubmit} className="mt-4 flex gap-2">
-    <input
-      type="text"
-      value={input}
-      onChange={(e) => setInput(e.target.value)}
-      placeholder="Demandez un syllabus..."
-      className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500"
-      disabled={isLoading}
-    />
-    <button
-      type="submit"
-      disabled={isLoading}
-      className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${isLoading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
-    >
-      {isLoading ? 'Chargement...' : 'Générer'}
-    </button>
-  </form>
-</div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-4 text-center">Assistant IA</h1>
+          <div className="chatbot-container h-[65vh] overflow-y-auto pr-4 flex flex-col space-y-4">
+            {messages.map((message, index) => (
+              <ChatMessage key={index} message={message.text} isUser={message.isUser} />
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+          <form onSubmit={handleSubmit} className="mt-4 flex gap-2">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Demandez un syllabus sur ..."
+              className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              disabled={isLoading}
+            />
+            <button
+              type="submit"
+              disabled={isLoading}
+              className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${isLoading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
+            >
+              {isLoading ? 'Chargement...' : 'Générer'}
+            </button>
+          </form>
+        </div>
 
-{/* Syllabus Section */}
-<div className={`w-full md:w-1/2 p-6 bg-gray-100 syllabus-container overflow-y-auto animate-fade-in ${generated ? 'block' : 'hidden'}`}>
+        {/* Syllabus Section */}
+        <div className={`w-full md:w-1/2 p-6 bg-gray-100 syllabus-container overflow-y-auto animate-fade-in ${generated ? 'block' : 'hidden'}`}>
           <h2 className="text-2xl font-bold text-gray-800 mb-4">Syllabus Généré</h2>
-          <SyllabusTemplate syllabus={syllabus} onChange={handleSyllabusChange} />
+          <SyllabusTemplate
+            syllabus={syllabus}
+            onChange={handleSyllabusChange}
+          />
         </div>
       </div>
     </div>
