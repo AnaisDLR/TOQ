@@ -229,14 +229,56 @@ body {
   white-space: pre-wrap;
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.5s ease-in-out;
+@keyframes move-left {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
 }
-@keyframes fadeIn {
+
+.animate-move-left {
+  animation: move-left 0.5s forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-in;
+}
+
+@keyframes fade-in {
   from {
     opacity: 0;
   }
   to {
     opacity: 1;
   }
+}
+
+.syllabus-template {
+  font-family: Arial, sans-serif;
+  padding: 20px;
+}
+
+.syllabus-template h1 {
+  color: #1f7478; /* Couleur verte pour les titres */
+  border-bottom: 2px solid #1f7478; /* Trait de séparation */
+  padding-bottom: 5px;
+}
+
+.syllabus-template .font-bold {
+  font-weight: bold;
+}
+
+.syllabus-template .table-auto {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.syllabus-template .border-b {
+  border-bottom: 2px solid #1f7478;
+}
+
+.syllabus-template .p-2 {
+  padding: 8px;
 }
