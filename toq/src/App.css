@@ -282,3 +282,53 @@ body {
 .syllabus-template .p-2 {
   padding: 8px;
 }
+
+/* Zone de chat (chatbot) */
+.chatbot-container {
+  max-height: 80vh; /* Limite la hauteur à 65% de la hauteur de la fenêtre */
+  overflow-y: auto; /* Permet le scroll vertical lorsque le contenu est trop long */
+  padding-right: 1rem; /* Pour éviter que le texte soit coupé sur la droite */
+  scrollbar-width: thin; /* Barre de défilement fine */
+  scrollbar-color: #1f7478 transparent; /* Couleur personnalisée de la barre de défilement */
+}
+
+/* Zone d'affichage du syllabus */
+.syllabus-container {
+  max-height: 80vh; /* Même hauteur pour le syllabus */
+  overflow-y: auto; /* Permet le scroll vertical lorsque le contenu est trop long */
+  scrollbar-width: thin; /* Barre de défilement fine */
+  scrollbar-color: #1f7478 transparent; /* Couleur personnalisée de la barre de défilement */
+}
+
+/* Styles des bulles de chat */
+.chat-message {
+  max-width: 70%; /* Limite la largeur des messages */
+  padding: 1rem;
+  border-radius: 9999px; /* Bulles arrondies */
+  font-size: 1rem;
+  line-height: 1.5;
+  margin-bottom: 1rem;
+  word-wrap: break-word;
+}
+
+/* Message de l'utilisateur */
+.chat-message.user {
+  background-color: #1f7478; /* Couleur de fond pour l'utilisateur */
+  color: white;
+  margin-left: auto; /* Aligne à droite */
+  border-bottom-right-radius: 0; /* Supprime l'angle bas gauche */
+}
+
+/* Message de l'IA */
+.chat-message.ai {
+  background-color: #f1f1f1; /* Couleur de fond pour l'IA */
+  color: #333;
+  margin-right: auto; /* Aligne à gauche */
+  border-bottom-left-radius: 0; /* Supprime l'angle bas droit */
+}
+
+.chat-message p {
+  margin: 0;
+  padding: 0;
+}
+
