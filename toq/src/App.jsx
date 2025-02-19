@@ -8,7 +8,6 @@ const ChatMessage = ({ message, isUser }) => (
   </div>
 );
 
-
 const App = () => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
