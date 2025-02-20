@@ -13,67 +13,97 @@ const SyllabusTemplate = ({ syllabus, onChange }) => {
   };
 
   const downloadSyllabus = () => {
-    const content = document.createElement('div');
-    content.innerHTML = `
-      <div style="font-family: Arial, sans-serif;">
-        <h1 style="color: #1f7478; font-weight: bold; margin-bottom: 5px;">
+    // Créer un container dédié pour le PDF
+    const pdfContainer = document.createElement('div');
+    pdfContainer.id = 'pdf-content';
+    document.body.appendChild(pdfContainer);
+  
+    // Préparer le contenu HTML
+    pdfContainer.innerHTML = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; color: black;">
+        <h1 style="color: #1f7478; font-size: 24px; font-weight: bold; margin-bottom: 5px;">
           ${syllabus.courseName} - ${syllabus.semester}
         </h1>
         <hr style="border: 2px solid #1f7478; margin-bottom: 20px;">
   
-        <p><strong>Crédits ECTS :</strong> ${syllabus.ectsCredits}</p>
-        <p><strong>Nombre d'heures dispensées :</strong> ${syllabus.hours}h</p>
+        <div style="margin-bottom: 15px;">
+          <p><strong>Crédits ECTS :</strong> ${syllabus.ectsCredits}</p>
+          <p><strong>Nombre d'heures dispensées :</strong> ${syllabus.hours}h</p>
+        </div>
   
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
           <tr>
-            <td style="border: 1px solid #ddd; padding: 8px; text-align: center;"><strong>Cours Magistraux</strong><br>${syllabus.lectures}</td>
-            <td style="border: 1px solid #ddd; padding: 8px; text-align: center;"><strong>Travaux Dirigés</strong><br>${syllabus.tutorials}</td>
-            <td style="border: 1px solid #ddd; padding: 8px; text-align: center;"><strong>Travaux Pratiques</strong><br>${syllabus.practicals}</td>
-            <td style="border: 1px solid #ddd; padding: 8px; text-align: center;"><strong>Projets</strong><br>${syllabus.projects}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: center; background-color: #f8f9fa;">
+              <strong>Cours Magistraux</strong><br>${syllabus.lectures}
+            </td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: center; background-color: #f8f9fa;">
+              <strong>Travaux Dirigés</strong><br>${syllabus.tutorials}
+            </td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: center; background-color: #f8f9fa;">
+              <strong>Travaux Pratiques</strong><br>${syllabus.practicals}
+            </td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: center; background-color: #f8f9fa;">
+              <strong>Projets</strong><br>${syllabus.projects}
+            </td>
           </tr>
         </table>
   
-        <p><strong>Enseignant référent :</strong> ${syllabus.mainTeacher}</p>
-        <p><strong>Équipe d'enseignants :</strong> ${syllabus.teachingTeam}</p>
-        <p><strong>Modalité pédagogique :</strong> ${syllabus.teachingMethod}</p>
-        <p><strong>Langue :</strong> ${syllabus.language}</p>
+        <div style="margin-bottom: 15px;">
+          <p><strong>Enseignant référent :</strong> ${syllabus.mainTeacher}</p>
+          <p><strong>Équipe d'enseignants :</strong> ${syllabus.teachingTeam}</p>
+          <p><strong>Modalité pédagogique :</strong> ${syllabus.teachingMethod}</p>
+          <p><strong>Langue :</strong> ${syllabus.language}</p>
+        </div>
   
-        <h2 style="color: #1f7478; margin-top: 20px;">Objectifs pédagogiques</h2>
-        <hr style="border: 1px solid #1f7478; margin-bottom: 10px;">
-        <p>${syllabus.objectives}</p>
-  
-        <h2 style="color: #1f7478; margin-top: 20px;">Pré requis</h2>
-        <hr style="border: 1px solid #1f7478; margin-bottom: 10px;">
-        <p>${syllabus.prerequisites}</p>
-  
-        <h2 style="color: #1f7478; margin-top: 20px;">Contenu</h2>
-        <hr style="border: 1px solid #1f7478; margin-bottom: 10px;">
-        <p>${syllabus.content}</p>
-  
-        <h2 style="color: #1f7478; margin-top: 20px;">Compétences à acquérir</h2>
-        <hr style="border: 1px solid #1f7478; margin-bottom: 10px;">
-        <p>${syllabus.skills}</p>
-  
-        <h2 style="color: #1f7478; margin-top: 20px;">Modalités d'évaluation</h2>
-        <hr style="border: 1px solid #1f7478; margin-bottom: 10px;">
-        <p>${syllabus.evaluation}</p>
-  
-        <h2 style="color: #1f7478; margin-top: 20px;">Références externes</h2>
-        <hr style="border: 1px solid #1f7478; margin-bottom: 10px;">
-        <p>${syllabus.references}</p>
+        ${createSection('Objectifs pédagogiques', syllabus.objectives)}
+        ${createSection('Pré requis', syllabus.prerequisites)}
+        ${createSection('Contenu', syllabus.content)}
+        ${createSection('Compétences à acquérir', syllabus.skills)}
+        ${createSection('Modalités d\'évaluation', syllabus.evaluation)}
+        ${createSection('Références externes', syllabus.references)}
       </div>
     `;
   
+    // Configuration des options PDF
     const options = {
-      margin: 1,
-      filename: `syllabus_${syllabus.courseName.replace(/\s+/g, '_').toLowerCase()}.pdf`,
+      margin: [10, 10],
+      filename: `syllabus_${syllabus.courseName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+      html2canvas: { 
+        scale: 2,
+        useCORS: true,
+        logging: false
+      },
+      jsPDF: { 
+        unit: 'mm', 
+        format: 'a4', 
+        orientation: 'portrait'
+      }
     };
   
-    html2pdf().from(content).set(options).save();
+    // Générer et télécharger le PDF
+    html2pdf()
+      .set(options)
+      .from(pdfContainer)
+      .save()
+      .then(() => {
+        // Nettoyer le container temporaire
+        document.body.removeChild(pdfContainer);
+      })
+      .catch(error => {
+        console.error('Erreur lors de la génération du PDF:', error);
+        document.body.removeChild(pdfContainer);
+      });
   };
+  
+  // Fonction utilitaire pour créer des sections
+  const createSection = (title, content) => `
+    <div style="margin-top: 20px;">
+      <h2 style="color: #1f7478; font-size: 18px; margin-bottom: 10px;">${title}</h2>
+      <hr style="border: 1px solid #1f7478; margin-bottom: 10px;">
+      <p style="line-height: 1.5;">${content}</p>
+    </div>
+  `;
 
   const saveSyllabus = async () => {
     try {
