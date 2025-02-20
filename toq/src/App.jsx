@@ -263,12 +263,6 @@ if (!awaitingSyllabusCount && !awaitingDistributionMode) {
     setRequestedSyllabusCount(null);
     setCurrentTheme('');
     
-    // Ne pas réinitialiser ces états pour conserver l'historique
-    // setMessages([]);
-    // setSyllabusList([]);
-    // setCurrentSyllabusIndex(0);
-    // setGenerated(false);
-    // setSyllabus({...});
   };
 
   // Modifier le handleFileChange existant
