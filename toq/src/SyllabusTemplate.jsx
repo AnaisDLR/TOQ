@@ -28,7 +28,7 @@ const SyllabusTemplate = ({ syllabus, onChange }) => {
   
         <div style="margin-bottom: 15px;">
           <p><strong>Crédits ECTS :</strong> ${syllabus.ectsCredits}</p>
-          <p><strong>Nombre d'heures dispensées :</strong> ${syllabus.hours}h</p>
+          <p><strong>Nombre d'heures dispensées :</strong> ${syllabus.hours}</p>
         </div>
   
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">

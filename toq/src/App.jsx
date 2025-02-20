@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import './App.css';
 import SyllabusTemplate from './SyllabusTemplate';
 import { Listbox } from '@headlessui/react';
+import logo from './assets/Logo_ECE_Paris2.png';
 
 const ChatMessage = ({ message, isUser }) => (
   <div className={`chat-message ${isUser ? 'user' : 'ai'} mb-4 animate-fade-in`}>
@@ -43,6 +44,7 @@ const App = () => {
   const [currentSyllabusIndex, setCurrentSyllabusIndex] = useState(0);
   const [awaitingDistributionMode, setAwaitingDistributionMode] = useState(false);
   const [requestedSyllabusCount, setRequestedSyllabusCount] = useState(null);
+  const [currentTheme, setCurrentTheme] = useState('');
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -58,8 +60,27 @@ const App = () => {
 
     setIsLoading(true);
     const userMessage = input;
-    setMessages(prev => [...prev, { text: userMessage, isUser: true }]);
     setInput('');
+
+    // Pour toute nouvelle entrée (nouveau thème)
+    
+if (!awaitingSyllabusCount && !awaitingDistributionMode) {
+  // Réinitialiser uniquement les états du processus
+  resetStates();
+  // Sauvegarder le nouveau thème
+  setCurrentTheme(userMessage);
+  // Ajouter le message utilisateur aux messages existants
+  setMessages(prev => [...prev, 
+    { text: userMessage, isUser: true },
+    { text: "Combien de syllabus souhaitez-vous générer ?", isUser: false }
+  ]);
+  setAwaitingSyllabusCount(true);
+  setIsLoading(false);
+  return;
+}
+
+    // Ajouter le message utilisateur pour les autres cas
+    setMessages(prev => [...prev, { text: userMessage, isUser: true }]);
 
     // Si on attend la réponse pour le nombre de syllabus
     if (awaitingSyllabusCount) {
@@ -77,24 +98,23 @@ const App = () => {
       setAwaitingSyllabusCount(false);
       setAwaitingDistributionMode(true);
       setMessages(prev => [...prev, {
-        text: `Comment souhaitez-vous répartir les ${selectedFiles.length} fichiers dans les ${count} syllabus ?`,
+        text: "Comment souhaitez-vous répartir le contenu dans les syllabus ?",
         isUser: false
       }]);
       setIsLoading(false);
       return;
     }
 
+    // Si on attend le mode de distribution
     if (awaitingDistributionMode) {
-      setAwaitingSyllabusCount(false);
-      setPdfDistributionMode(userMessage);
-
-      // Déclencher automatiquement la génération
-      const promptText = "Génère les syllabus";
-      setMessages(prev => [...prev,
-      { text: "Génération des syllabus en cours...", isUser: false }
-      ]);
-
       try {
+        setAwaitingDistributionMode(false);
+        setPdfDistributionMode(userMessage);
+        
+        setMessages(prev => [...prev,
+          { text: "Génération de(s) syllabus en cours...", isUser: false }
+        ]);
+
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -105,10 +125,11 @@ const App = () => {
             model: "gpt-4",
             messages: [{
               role: "user",
-              content: `Nombre de syllabus demandé : ${requestedSyllabusCount}
+              content: `Thème demandé : ${currentTheme}
+              Nombre de syllabus demandé : ${requestedSyllabusCount}
               Distribution demandée : ${userMessage}
               Fichiers PDF fournis : ${selectedFiles.map(f => f.name).join(', ')}
-              Génère exactement ${requestedSyllabusCount} syllabus selon cette distribution. Pour chaque syllabus, utilise ce format :
+              Génère exactement ${requestedSyllabusCount} syllabus sur le thème "${currentTheme}" selon cette distribution. Pour chaque syllabus, utilise ce format :
               
               **Nom du Cours** : ...
               **Semestre** : ...
@@ -155,6 +176,12 @@ const App = () => {
         setMessages(prev => [...prev,
         { text: `${syllabusArray.length} syllabus ont été générés !`, isUser: false }
         ]);
+
+        // Après la génération réussie, réinitialiser les états pour la prochaine entrée
+        setAwaitingSyllabusCount(false);
+        setAwaitingDistributionMode(false);
+        setPdfDistributionMode(null);
+        
       } catch (error) {
         console.error('Erreur:', error);
         setMessages(prev => [...prev, { text: "Erreur lors de la génération.", isUser: false }]);
@@ -164,72 +191,19 @@ const App = () => {
       return;
     }
 
-    try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_REACT_APP_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: "gpt-4",
-          messages: [{
-            role: "user",
-            content: `${selectedFiles.length > 0
-              ? `Distribution demandée : ${pdfDistributionMode}. 
-                Fichiers PDF fournis : ${selectedFiles.map(f => f.name).join(', ')}.`
-              : ''} 
-            Génère ${pdfDistributionMode ? 'les syllabus selon la distribution demandée' : 'un syllabus'} pour le cours "${userMessage}" avec des valeurs pour chaque section :
-            
-            **Nom du Cours** : (ex: Introduction à la Programmation)
-            **Semestre** : (ex: S1 2024)
-            **Crédits ECTS** : (ex: 5)
-            **Nombre d'heures dispensées** : (ex: 40)
-            **Cours Magistraux** : (ex: 20)
-            **Travaux Dirigés** : (ex: 10)
-            **Travaux Pratiques** : (ex: 5)
-            **Projets** : (ex: 5)
-            **Enseignant référent** : (ex: Dr. Dupont)
-            **Equipe d'enseignants** : (ex: Dr. Dupont, Dr. Martin)
-            **Modalité pédagogique** : (ex: Présentiel)
-            **Langue** : (ex: Français)
-            **Objectifs pédagogiques** : (ex: Acquérir les bases de la programmation)
-            **Pré requis** : (ex: Aucun)
-            **Contenu** : (ex: Introduction, Variables, Boucles, Fonctions)
-            **Compétences à acquérir** : (ex: Programmation de base)
-            **Modalités d'évaluation** : (ex: Examen final, Travaux pratiques)
-            **Références externes** : (ex: Livre A, Livre B)
-      
-            Remplis chaque section avec des valeurs détaillées.`
-          }],
-          temperature: 0.7
-        }),
-      });
+    // Pour toute nouvelle entrée (nouveau thème)
+    if (!awaitingSyllabusCount && !awaitingDistributionMode) {
+      // Réinitialiser les états
+      resetStates();
 
-      console.log('API Key exists:', !!import.meta.env.VITE_REACT_APP_API_KEY);
-
-      const data = await response.json();
-      console.log('Raw API Response:', data);
-      if (!response.ok) throw new Error(data.error?.message || 'Erreur API');
-
-      const aiResponse = data.choices[0].message.content;
-      console.log('AI Response:', aiResponse);
-      const newSyllabus = parseSyllabus(aiResponse);
-      console.log('Parsed Syllabus:', newSyllabus);
-      setSyllabus(newSyllabus);
-      setGenerated(true);
-
-      // Ajouter un message final de l'IA
-      setMessages(prev => [
-        ...prev,
-        { text: "Voici le syllabus ! N'hésitez pas à me faire savoir si vous avez d'autres questions ou demandes.", isUser: false }
-      ]);
-    } catch (error) {
-      console.error('Erreur:', error);
-      setMessages(prev => [...prev, { text: "Erreur lors de la génération.", isUser: false }]);
-      setGenerated(false);
-    } finally {
+      // Poser la question pour le nombre de syllabus
+      setMessages(prev => [...prev, {
+        text: "Combien de syllabus souhaitez-vous générer ?",
+        isUser: false
+      }]);
+      setAwaitingSyllabusCount(true);
       setIsLoading(false);
+      return;
     }
   };
 
@@ -281,10 +255,28 @@ const App = () => {
     }));
   };
 
+  const resetStates = () => {
+    // Réinitialiser uniquement les états du processus de génération
+    setAwaitingSyllabusCount(false);
+    setAwaitingDistributionMode(false);
+    setPdfDistributionMode(null);
+    setRequestedSyllabusCount(null);
+    setCurrentTheme('');
+    
+    // Ne pas réinitialiser ces états pour conserver l'historique
+    // setMessages([]);
+    // setSyllabusList([]);
+    // setCurrentSyllabusIndex(0);
+    // setGenerated(false);
+    // setSyllabus({...});
+  };
+
+  // Modifier le handleFileChange existant
   const handleFileChange = (event) => {
     const files = Array.from(event.target.files);
     const pdfFiles = files.filter(file => file.type === 'application/pdf');
     setSelectedFiles(pdfFiles);
+    resetStates();
 
     if (pdfFiles.length > 0) {
       setMessages(prev => [...prev, {
@@ -298,112 +290,131 @@ const App = () => {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-600 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl flex overflow-hidden">
-        {/* Chatbot Section */}
-        <div className="w-full md:w-1/2 p-6 flex flex-col transition-all duration-500">
-          <h1 className="text-3xl font-bold text-gray-800 mb-4 text-center">Assistant IA</h1>
-          <div className="chatbot-container h-[65vh] overflow-y-auto pr-4 flex flex-col space-y-4">
-            {messages.map((message, index) => (
-              <ChatMessage key={index} message={message.text} isUser={message.isUser} />
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
-          <form onSubmit={handleSubmit} className="mt-4 flex gap-2 items-center">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept=".pdf"
-              multiple
-              className="hidden"
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current.click()}
-              className="min-w-[44px] h-[44px] flex items-center justify-center rounded-lg bg-gray-200 hover:bg-gray-300 transition-all duration-200"
-              title="Joindre des PDF"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 text-gray-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                />
-              </svg>
-            </button>
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Demandez un syllabus sur ..."
-              className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500"
-              disabled={isLoading}
-            />
-            <button
-              type="submit"
-              disabled={isLoading}
-              className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${isLoading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
-            >
-              {isLoading ? 'Chargement...' : 'Générer'}
-            </button>
-          </form>
-        </div>
+  // Ajouter un useEffect pour réinitialiser les états quand l'input change
+  useEffect(() => {
+    if (input.trim() !== '') {
 
-        {/* Syllabus Section */}
-        <div className={`w-full md:w-1/2 p-6 bg-gray-100 syllabus-container overflow-y-auto animate-fade-in ${generated ? 'block' : 'hidden'}`}>
-          <h2 className="text-2xl font-bold text-gray-300 mb-4">Syllabus Généré</h2>
-          {syllabusList.length > 1 && (
-            <div className="mb-4 relative w-20">
-              <Listbox
-                value={currentSyllabusIndex}
-                onChange={(index) => {
-                  setCurrentSyllabusIndex(index);
-                  setSyllabus(syllabusList[index]);
-                }}
-              >
-                <Listbox.Button className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-600 cursor-pointer hover:border-blue-500 transition-all duration-200 flex justify-between items-center">
-                  <span className="text-white">Syllabus {currentSyllabusIndex + 1}</span>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 text-gray-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    width="40" 
-                    height="40" 
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </Listbox.Button>
-                <Listbox.Options className="absolute w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-auto z-10">
-                  {syllabusList.map((_, index) => (
-                    <Listbox.Option
-                      key={index}
-                      value={index}
-                      className={({ active }) =>
-                        `p-3 text-sm cursor-pointer text-white ${active ? 'bg-blue-600' : 'bg-gray-700'}`
-                      }
-                    >
-                      Syllabus {index + 1}
-                    </Listbox.Option>
-                  ))}
-                </Listbox.Options>
-              </Listbox>
+    }
+  }, [input]);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-600 relative">
+      {/* Logo */}
+      <div className="absolute top-4 left-4">
+        <img
+          src={logo}
+          alt="Logo"
+          className="w-0.5 h-0.5 object-contain"
+        />
+      </div>
+
+      {/* Conteneur principal */}
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-600 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl flex overflow-hidden">
+          {/* Chatbot Section */}
+          <div className="w-full md:w-1/2 p-6 flex flex-col transition-all duration-500">
+            <h1 className="text-3xl font-bold text-gray-800 mb-4 text-center">Assistant IA</h1>
+            <div className="chatbot-container h-[65vh] overflow-y-auto pr-4 flex flex-col space-y-4">
+              {messages.map((message, index) => (
+                <ChatMessage key={index} message={message.text} isUser={message.isUser} />
+              ))}
+              <div ref={messagesEndRef} />
             </div>
-          )}
-          <SyllabusTemplate
-            syllabus={syllabus}
-            onChange={handleSyllabusChange}
-          />
+            <form onSubmit={handleSubmit} className="mt-4 flex gap-2 items-center">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept=".pdf"
+                multiple
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current.click()}
+                className="min-w-[44px] h-[44px] flex items-center justify-center rounded-lg bg-gray-200 hover:bg-gray-300 transition-all duration-200"
+                title="Joindre des PDF"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5 text-gray-600"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                  />
+                </svg>
+              </button>
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Demandez un syllabus sur ..."
+                className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                disabled={isLoading}
+              />
+              <button
+                type="submit"
+                disabled={isLoading}
+                className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 ${isLoading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
+              >
+                {isLoading ? 'Chargement...' : 'Générer'}
+              </button>
+            </form>
+          </div>
+
+          {/* Syllabus Section */}
+          <div className={`w-full md:w-1/2 p-6 bg-gray-100 syllabus-container overflow-y-auto animate-fade-in ${generated ? 'block' : 'hidden'}`}>
+            <h2 className="text-2xl font-bold text-gray-300 mb-4">Syllabus Généré</h2>
+            {syllabusList.length > 1 && (
+              <div className="mb-4 relative w-20">
+                <Listbox
+                  value={currentSyllabusIndex}
+                  onChange={(index) => {
+                    setCurrentSyllabusIndex(index);
+                    setSyllabus(syllabusList[index]);
+                  }}
+                >
+                  <Listbox.Button className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-600 cursor-pointer hover:border-blue-500 transition-all duration-200 flex justify-between items-center">
+                    <span className="text-white">Syllabus {currentSyllabusIndex + 1}</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4 text-gray-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      width="40"
+                      height="40"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </Listbox.Button>
+                  <Listbox.Options className="absolute w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-auto z-10">
+                    {syllabusList.map((_, index) => (
+                      <Listbox.Option
+                        key={index}
+                        value={index}
+                        className={({ active }) =>
+                          `p-3 text-sm cursor-pointer text-white ${active ? 'bg-blue-600' : 'bg-gray-700'}`
+                        }
+                      >
+                        Syllabus {index + 1}
+                      </Listbox.Option>
+                    ))}
+                  </Listbox.Options>
+                </Listbox>
+              </div>
+            )}
+            <SyllabusTemplate
+              syllabus={syllabus}
+              onChange={handleSyllabusChange}
+            />
+          </div>
         </div>
       </div>
     </div>
