@@ -1,11 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { Save, Download } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
-import { AzureStorageService } from '../services/azureStorage';
+//import { AzureStorageService } from '../services/azureStorage';
 
 const SyllabusTemplate = ({ syllabus, onChange }) => {
   const [saveStatus, setSaveStatus] = useState('');
-  const azureStorage = new AzureStorageService();
+  //const azureStorage = new AzureStorageService();
 
   const handleChange = (field, value) => {
     onChange(field, value);
@@ -83,7 +83,7 @@ const SyllabusTemplate = ({ syllabus, onChange }) => {
       localStorage.setItem('savedSyllabus', JSON.stringify(syllabus));
       
       // Sauvegarde sur Azure
-      await azureStorage.saveSyllabus(syllabus);
+      //await azureStorage.saveSyllabus(syllabus);
       
       setSaveStatus('Syllabus sauvegardé avec succès !');
       setTimeout(() => setSaveStatus(''), 3000);
