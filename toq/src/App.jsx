@@ -11,7 +11,9 @@ const ChatMessage = ({ message, isUser }) => (
 );
 
 const App = () => {
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState([
+    {text: "Bienvenue sur TOQ ! Ravi de vous revoir. En quoi puis-je vous être utile aujourd'hui ?", isUser:false}
+  ]);
   const [input, setInput] = useState('');
   const [syllabus, setSyllabus] = useState({
     courseName: '',
@@ -39,7 +41,7 @@ const App = () => {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const fileInputRef = useRef(null);
   const [awaitingSyllabusCount, setAwaitingSyllabusCount] = useState(false);
-  const [pdfDistributionMode, setPdfDistributionMode] = useState(null);
+  const [pdfDistributionMode, setPdfDistributionMode] = useState("standard");
   const [syllabusList, setSyllabusList] = useState([]);
   const [currentSyllabusIndex, setCurrentSyllabusIndex] = useState(0);
   const [awaitingDistributionMode, setAwaitingDistributionMode] = useState(false);
@@ -104,6 +106,7 @@ if (!awaitingSyllabusCount && !awaitingDistributionMode) {
       setIsLoading(false);
       return;
     }
+
 
     // Si on attend le mode de distribution
     if (awaitingDistributionMode) {
@@ -307,7 +310,7 @@ if (!awaitingSyllabusCount && !awaitingDistributionMode) {
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl flex overflow-hidden">
           {/* Chatbot Section */}
           <div className="w-full md:w-1/2 p-6 flex flex-col transition-all duration-500">
-            <h1 className="text-3xl font-bold text-gray-800 mb-4 text-center">Assistant IA</h1>
+            <h1 className="text-3xl font-bold text-gray-800 mb-4 text-center">TOQ : Votre générateur de syllabus</h1>
             <div className="chatbot-container h-[65vh] overflow-y-auto pr-4 flex flex-col space-y-4">
               {messages.map((message, index) => (
                 <ChatMessage key={index} message={message.text} isUser={message.isUser} />
