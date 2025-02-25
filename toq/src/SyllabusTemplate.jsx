@@ -1,16 +1,44 @@
 import React, { useState, useRef } from 'react';
 import { Save, Download } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
-//import { AzureStorageService } from '../services/azureStorage';
 
 const SyllabusTemplate = ({ syllabus, onChange }) => {
   const [saveStatus, setSaveStatus] = useState('');
-  //const azureStorage = new AzureStorageService();
+  const contentRefs = useRef({});
 
-  const handleChange = (field, value) => {
-    onChange(field, value);
-    setSaveStatus('');
+  const handleEdit = (field, event) => {
+    if (contentRefs.current[field]) {
+      contentRefs.current[field].textContent = event.target.textContent;
+    }
   };
+
+  const handleBlur = (field) => {
+    onChange(field, contentRefs.current[field]?.textContent || '');
+  };
+
+  const handleKeyDown = (field, event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      event.target.blur();
+    }
+  };
+
+  const EditableField = ({ label, value, field, isShort = false }) => (
+    <div className={`mb-4 ${isShort ? 'max-w-[200px]' : ''}`}>
+      <label className="block text-sm font-medium mb-1 text-white">{label}</label>
+      <div
+        contentEditable
+        suppressContentEditableWarning
+        onInput={(e) => handleEdit(field, e)}
+        onBlur={() => handleBlur(field)}
+        onKeyDown={(e) => handleKeyDown(field, e)}
+        className="w-full p-2 border rounded-lg bg-[#282826] text-white focus:ring-2 focus:ring-blue-500 min-h-1"
+        ref={(el) => (contentRefs.current[field] = el)}
+      >
+        {value}
+      </div>
+    </div>
+  );
 
   const downloadSyllabus = () => {
     // Créer un container dédié pour le PDF
@@ -123,29 +151,6 @@ const SyllabusTemplate = ({ syllabus, onChange }) => {
     }
   };
 
-  const InputField = ({ label, value, onChange, type = "text", isShort = false }) => {
-    return (
-      <div className={`mb-4 ${isShort ? 'max-w-[200px]' : ''}`}>
-        <label className="block text-sm font-medium mb-1 text-white">{label}</label>
-        {type === "textarea" ? (
-          <textarea
-            value={value || ''}
-            onChange={(e) => onChange(e.target.value)}
-            className="w-full p-2 border rounded-lg bg-[#282826] text-white min-h-[100px] resize-none focus:ring-2 focus:ring-blue-500"
-          />
-        ) : (
-          <input
-            type="text"
-            value={value || ''}
-            onChange={(e) => onChange(e.target.value)}
-            maxLength={255}
-            className="w-full p-2 border rounded-lg bg-[#282826] text-white focus:ring-2 focus:ring-blue-500"
-          />
-        )}
-      </div>
-    );
-  };
-
   return (
     <div className="syllabus-template space-y-4">
       <div className="flex justify-between items-center mb-6">
@@ -169,152 +174,63 @@ const SyllabusTemplate = ({ syllabus, onChange }) => {
       </div>
 
       {saveStatus && (
-        <div className="mb-4 p-2 bg-green-800 text-white rounded-lg">
-          {saveStatus}
-        </div>
+        <div className="mb-4 p-2 bg-green-800 text-white rounded-lg">{saveStatus}</div>
       )}
 
-      <InputField
-        label="Nom du Cours"
-        value={syllabus.courseName}
-        onChange={(value) => handleChange('courseName', value)}
-      />
-
-      <InputField
-        label="Semestre"
-        value={syllabus.semester}
-        onChange={(value) => handleChange('semester', value)}
-      />
-
+      <EditableField label="Nom du Cours" value={syllabus.courseName} field="courseName" />
+      <EditableField label="Semestre" value={syllabus.semester} field="semester" />
+      
       <hr className="border-gray-600 my-6" />
-
       <div className="grid grid-cols-2 gap-4">
-        <InputField
-          label="Crédits ECTS"
-          value={syllabus.ectsCredits}
-          onChange={(value) => handleChange('ectsCredits', value)}
-          isShort={true}
-        />
-        <InputField
-          label="Nombre d'heures dispensées"
-          value={syllabus.hours}
-          onChange={(value) => handleChange('hours', value)}
-          //isShort={true}
-        />
+        <EditableField label="Crédits ECTS" value={syllabus.ectsCredits} field="ectsCredits" isShort={true}/>
+        <EditableField label="Nombre d'heures dispensées" value={syllabus.hours} field="hours" />
+      </div>
+      
+      <div className="grid grid-cols-2 gap-4">
+        <EditableField label="Cours Magistraux" value={syllabus.lectures} field="lectures" isShort={true}/>
+        <EditableField label="Travaux Dirigés" value={syllabus.tutorials} field="tutorials" />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <InputField
-          label="Cours Magistraux"
-          value={syllabus.lectures}
-          onChange={(value) => handleChange('lectures', value)}
-          isShort={true}
-        />
-        <InputField
-          label="Travaux Dirigés"
-          value={syllabus.tutorials}
-          onChange={(value) => handleChange('tutorials', value)}
-          //isShort={true}
-        />
-      </div>
+        <EditableField label="Travaux Pratiques" value={syllabus.practicals} field="practicals" isShort={true} />
+        <EditableField label="Projets" value={syllabus.projects} field="projects" />
+      </div>      
+      
+      <hr className="border-gray-600 my-6" />
 
       <div className="grid grid-cols-2 gap-4">
-        <InputField
-          label="Travaux Pratiques"
-          value={syllabus.practicals}
-          onChange={(value) => handleChange('practicals', value)}
-          isShort={true}
-        />
-        <InputField
-          label="Projets"
-          value={syllabus.projects}
-          onChange={(value) => handleChange('projects', value)}
-          //isShort={true}
-        />
+        <EditableField label="Enseignant référent" value={syllabus.mainTeacher} field="mainTeacher" isShort={true}/>
+        <EditableField label="Équipe d'enseignants" value={syllabus.teachingTeam} field="teachingTeam" />
       </div>
-
+      
       <div className="grid grid-cols-2 gap-4">
-        <InputField
-          label="Enseignant référent"
-          value={syllabus.mainTeacher}
-          onChange={(value) => handleChange('mainTeacher', value)}
-          isShort={true}
-        />
-        <InputField
-          label="Equipe d'enseignants"
-          value={syllabus.teachingTeam}
-          onChange={(value) => handleChange('teachingTeam', value)}
-          //isShort={true}
-        />
+        <EditableField label="Modalité pédagogique" value={syllabus.teachingMethod} field="teachingMethod" isShort={true}/>
+        <EditableField label="Langue" value={syllabus.language} field="language" />
       </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <InputField
-          label="Modalité pédagogique"
-          value={syllabus.teachingMethod}
-          onChange={(value) => handleChange('teachingMethod', value)}
-          isShort={true}
-        />
-        <InputField
-          label="Langue"
-          value={syllabus.language}
-          onChange={(value) => handleChange('language', value)}
-          //isShort={true}
-        />
-      </div>
-
-
-      <InputField
-        label="Objectifs pédagogiques"
-        value={syllabus.objectives}
-        onChange={(value) => handleChange('objectives', value)}
-        type="textarea"
-      />
-
+      
       <hr className="border-gray-600 my-6" />
 
-      <InputField
-        label="Pré requis"
-        value={syllabus.prerequisites}
-        onChange={(value) => handleChange('prerequisites', value)}
-        type="textarea"
-      />
-
+      <EditableField label="Objectifs pédagogiques" value={syllabus.objectives} field="objectives" />
+      
       <hr className="border-gray-600 my-6" />
 
-      <InputField
-        label="Contenu"
-        value={syllabus.content}
-        onChange={(value) => handleChange('content', value)}
-        type="textarea"
-      />
-
+      <EditableField label="Pré requis" value={syllabus.prerequisites} field="prerequisites" />
+      
       <hr className="border-gray-600 my-6" />
-
-      <InputField
-        label="Compétences à acquérir"
-        value={syllabus.skills}
-        onChange={(value) => handleChange('skills', value)}
-        type="textarea"
-      />
-
+      
+      <EditableField label="Contenu" value={syllabus.content} field="content" />
+      
       <hr className="border-gray-600 my-6" />
-
-      <InputField
-        label="Modalités d'évaluation"
-        value={syllabus.evaluation}
-        onChange={(value) => handleChange('evaluation', value)}
-        type="textarea"
-      />
-
+      
+      <EditableField label="Compétences à acquérir" value={syllabus.skills} field="skills" />
+      
       <hr className="border-gray-600 my-6" />
-
-      <InputField
-        label="Références externes"
-        value={syllabus.references}
-        onChange={(value) => handleChange('references', value)}
-        type="textarea"
-      />
+      
+      <EditableField label="Modalités d'évaluation" value={syllabus.evaluation} field="evaluation" />
+      
+      <hr className="border-gray-600 my-6" />
+      
+      <EditableField label="Références externes" value={syllabus.references} field="references" />
     </div>
   );
 };
