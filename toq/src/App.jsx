@@ -3,6 +3,10 @@ import './App.css';
 import SyllabusTemplate from './SyllabusTemplate';
 import { Listbox } from '@headlessui/react';
 import logo from './assets/Logo_ECE_Paris2.png';
+import { Analytics } from '@vercel/analytics/react';
+import * as pdfjsLib from 'pdfjs-dist/build/pdf';
+import { GlobalWorkerOptions } from 'pdfjs-dist/build/pdf';
+GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 const ChatMessage = ({ message, isUser }) => (
   <div className={`chat-message ${isUser ? 'user' : 'ai'} mb-4 animate-fade-in`}>
@@ -12,8 +16,9 @@ const ChatMessage = ({ message, isUser }) => (
 
 const App = () => {
   const apiKey = import.meta.env.VITE_REACT_APP_API_KEY;
+  console.log('API Key:', apiKey ? 'Définie' : 'Non définie');
   const [messages, setMessages] = useState([
-    {text: "Bienvenue sur TOQ ! Ravi de vous revoir. En quoi puis-je vous être utile aujourd'hui ?", isUser:false}
+    { text: "Bienvenue sur TOQ ! Ravi de vous revoir. Sur quel sujet souhaitez-vous créer votre syllabus aujourd’hui ?", isUser: false }
   ]);
   const [input, setInput] = useState('');
   const [syllabus, setSyllabus] = useState({
@@ -53,6 +58,53 @@ const App = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  const loadPdfText = async (file) => {
+    const loadingTask = pdfjsLib.getDocument(URL.createObjectURL(file));
+    const pdf = await loadingTask.promise;
+    const textContent = [];
+
+    // Limiter le nombre de pages à traiter si le PDF est très long
+    const maxPages = Math.min(pdf.numPages, 10); // Traiter max 10 pages par PDF
+
+    for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const text = await page.getTextContent();
+      textContent.push(text.items.map(item => item.str).join(' '));
+    }
+
+    // Limiter la taille du texte extrait (environ 1000 tokens par PDF)
+    const combinedText = textContent.join('\n');
+    return combinedText.length > 4000 ? combinedText.substring(0, 4000) + "... [contenu tronqué]" : combinedText;
+  };
+
+  const summarizePdfContent = (pdfContent, maxLength = 1000) => {
+    if (!pdfContent || pdfContent.length <= maxLength) return pdfContent;
+
+    // Extraire les sections importantes (titres, en-têtes, etc.)
+    const importantSections = pdfContent.split('\n')
+      .filter(line => {
+        const trimmed = line.trim();
+        return trimmed.length > 0 &&
+          (trimmed.endsWith(':') ||
+            /^[A-Z]/.test(trimmed) ||
+            trimmed.length < 100);
+      })
+      .join('\n');
+
+    // Si même les sections importantes sont trop longues, tronquer
+    if (importantSections.length > maxLength) {
+      return importantSections.substring(0, maxLength) + "... [contenu résumé]";
+    }
+
+    return importantSections;
+  };
+
+  const extractPdfTitle = async (file) => {
+    const pdf = await pdfjsLib.getDocument(URL.createObjectURL(file)).promise;
+    const metadata = await pdf.getMetadata();
+    return metadata.info.Title || file.name;
+  };
+
   useEffect(() => {
     scrollToBottom();
   }, [messages, syllabus]);
@@ -66,21 +118,21 @@ const App = () => {
     setInput('');
 
     // Pour toute nouvelle entrée (nouveau thème)
-    
-if (!awaitingSyllabusCount && !awaitingDistributionMode) {
-  // Réinitialiser uniquement les états du processus
-  resetStates();
-  // Sauvegarder le nouveau thème
-  setCurrentTheme(userMessage);
-  // Ajouter le message utilisateur aux messages existants
-  setMessages(prev => [...prev, 
-    { text: userMessage, isUser: true },
-    { text: "Combien de syllabus souhaitez-vous générer ?", isUser: false }
-  ]);
-  setAwaitingSyllabusCount(true);
-  setIsLoading(false);
-  return;
-}
+
+    if (!awaitingSyllabusCount && !awaitingDistributionMode) {
+      // Réinitialiser uniquement les états du processus
+      resetStates();
+      // Sauvegarder le nouveau thème
+      setCurrentTheme(userMessage);
+      // Ajouter le message utilisateur aux messages existants
+      setMessages(prev => [...prev,
+      { text: userMessage, isUser: true },
+      { text: "Combien de syllabus souhaitez-vous générer ?", isUser: false }
+      ]);
+      setAwaitingSyllabusCount(true);
+      setIsLoading(false);
+      return;
+    }
 
     // Ajouter le message utilisateur pour les autres cas
     setMessages(prev => [...prev, { text: userMessage, isUser: true }]);
@@ -100,24 +152,46 @@ if (!awaitingSyllabusCount && !awaitingDistributionMode) {
       setRequestedSyllabusCount(count);
       setAwaitingSyllabusCount(false);
       setAwaitingDistributionMode(true);
-      setMessages(prev => [...prev, {
-        text: "Comment souhaitez-vous répartir le contenu dans les syllabus ?",
-        isUser: false
-      }]);
-      setIsLoading(false);
-      return;
+      if (count === 1) {
+        setMessages(prev => [...prev, {
+          text: `Souhaitez-vous générer un seul syllabus pour le thème : ${currentTheme} ?`,
+          isUser: false
+        }]);
+        setIsLoading(false);
+        return;
+      } else {
+        setMessages(prev => [...prev, {
+          text: "Comment souhaitez-vous répartir le contenu dans les syllabus ?",
+          isUser: false
+        }]);
+        setIsLoading(false);
+        return;
+      }
     }
-
 
     // Si on attend le mode de distribution
     if (awaitingDistributionMode) {
       try {
         setAwaitingDistributionMode(false);
         setPdfDistributionMode(userMessage);
-        
+
         setMessages(prev => [...prev,
-          { text: "Génération de(s) syllabus en cours...", isUser: false }
+        { text: "Génération de(s) syllabus en cours...", isUser: false }
         ]);
+
+        //récupérer le contenu des pdf (pas seulement le nom) dans une variable
+        const pdfContent = await Promise.all(selectedFiles.map(async file => {
+          const content = await loadPdfText(file);
+          return {
+            name: file.name,
+            summary: summarizePdfContent(content)
+          };
+        }));
+
+        // Préparer un résumé concis des PDF pour l'API
+        const pdfSummaries = pdfContent.map(pdf =>
+          `Fichier: ${pdf.name}\nRésumé: ${pdf.summary}`
+        ).join('\n\n');
 
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -133,6 +207,7 @@ if (!awaitingSyllabusCount && !awaitingDistributionMode) {
               Nombre de syllabus demandé : ${requestedSyllabusCount}
               Distribution demandée : ${userMessage}
               Fichiers PDF fournis : ${selectedFiles.map(f => f.name).join(', ')}
+              Informations extraites des PDF : ${pdfSummaries}
               Génère exactement ${requestedSyllabusCount} syllabus sur le thème "${currentTheme}" selon cette distribution. Pour chaque syllabus, utilise ce format :
               
               **Nom du Cours** : ...
@@ -181,11 +256,15 @@ if (!awaitingSyllabusCount && !awaitingDistributionMode) {
         { text: `${syllabusArray.length} syllabus ont été générés !`, isUser: false }
         ]);
 
+        setMessages(prev => [...prev,
+        { text: `Sur quel autre sujet souhaitez-vous créer votre syllabus ?`, isUser: false }
+        ]);
+
         // Après la génération réussie, réinitialiser les états pour la prochaine entrée
         setAwaitingSyllabusCount(false);
         setAwaitingDistributionMode(false);
         setPdfDistributionMode(null);
-        
+
       } catch (error) {
         console.error('Erreur:', error);
         setMessages(prev => [...prev, { text: "Erreur lors de la génération.", isUser: false }]);
@@ -266,17 +345,20 @@ if (!awaitingSyllabusCount && !awaitingDistributionMode) {
     setPdfDistributionMode(null);
     setRequestedSyllabusCount(null);
     setCurrentTheme('');
-    
+
   };
 
   // Modifier le handleFileChange existant
-  const handleFileChange = (event) => {
+  const handleFileChange = async (event) => {
     const files = Array.from(event.target.files);
     const pdfFiles = files.filter(file => file.type === 'application/pdf');
     setSelectedFiles(pdfFiles);
     resetStates();
 
     if (pdfFiles.length > 0) {
+      const pdfTitles = await Promise.all(pdfFiles.map(file => extractPdfTitle(file)));
+      const theme = pdfTitles.join(', ');
+      setCurrentTheme(theme);
       setMessages(prev => [...prev, {
         text: `${pdfFiles.length} fichier(s) PDF sélectionné(s) : ${pdfFiles.map(f => f.name).join(', ')}`,
         isUser: true
@@ -295,19 +377,26 @@ if (!awaitingSyllabusCount && !awaitingDistributionMode) {
     }
   }, [input]);
 
+  useEffect(() => {
+    if (syllabusList.length > 0) {
+      setCurrentSyllabusIndex(syllabusList.length - 1);
+      setSyllabus(syllabusList[syllabusList.length - 1]);
+    }
+  }, [syllabusList]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-600 relative">
       {/* Logo */}
-      <div className="absolute top-4 left-4">
-        <img
+      <div className="absolute top-4 left-4 z-20">
+        {/* <img
           src={logo}
           alt="Logo"
-          className="w-0.5 h-0.5 object-contain"
-        />
+          className="w-0.1 h-0.1 object-contain"
+        /> */}
       </div>
 
       {/* Conteneur principal */}
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-600 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-600 flex items-center justify-center p-4 pt-24">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl flex overflow-hidden">
           {/* Chatbot Section */}
           <div className="w-full md:w-1/2 p-6 flex flex-col transition-all duration-500">
@@ -415,6 +504,7 @@ if (!awaitingSyllabusCount && !awaitingDistributionMode) {
           </div>
         </div>
       </div>
+      <Analytics />
     </div>
   );
 };
